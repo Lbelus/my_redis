@@ -1,77 +1,51 @@
 class RESPParser:
     def parse(self, message):
         """Parse a RESP message."""
+        result = self.simple_ft(message)
+        return result if result is not None else self.aggregate_ft(message)
+
+    def simple_ft(self, message):   
         if message.startswith('+'):  # Simple String
             return message[1:-2]
         elif message.startswith('-'):  # Error
             return Exception(message[1:-2])
         elif message.startswith(':'):  # Integer
             return int(message[1:-2])
-        elif message.startswith('$'):  # Bulk String
-            length = int(message[1:message.index('\r\n')])
-            if length == -1:
-                return None
-            start = message.index('\r\n') + 2
-            return message[start:start + length]
-        elif message.startswith('*'):  # Array
-            length = int(message[1:message.index('\r\n')])
-            if length == -1:
-                return None
-            return self.parse_array(message)
         elif message.startswith('_'): # Nulls
-            return message[1:-2]
+            return ""
         elif message.startswith('#'): # Booleans
             return message[1:-2]
         elif message.startswith(','): # Doubles
             return float(message[1:-2])
         elif message.startswith('('): # Big numbers
             return int(message[1:-2])
+        else:
+            return None
+
+    def aggregate_ft(self, message): 
+        length = int(message[1:message.index('\r\n')])
+        if length == -1:
+            return None
+        if message.startswith('$'):  # Bulk String
+            start = message.index('\r\n') + 2
+            return message[start:start + length]
+        elif message.startswith('*'):  # Array
+            return self.parse_array(message)
         elif message.startswith('!'): # Bulk errors
             length = int(message[1:message.index('\r\n')])
-            if length == -1:
-                return None
             start = message.index('\r\n') + 2
             return Exception(message[start:start + length])
         elif message.startswith('='): # Verbatim Strings
-            length = int(message[1:message.index('\r\n')])
-            if length == -1:
-                return None
             start = message.index('\r\n') + 2
             return message[start:start + length]
         elif message.startswith('%'): # Maps
-            count = int(message[1:message.index('\r\n')])
-            dictionary = {}
-            remainder = message[message.index('\r\n') + 2:]
-            for _ in range(count):
-                key, remainder = self.parse_bulk_string(remainder)
-                value, remainder = self.parse_bulk_string(remainder)
-                dictionary[key] = value
-            return dictionary
+            return self.parse_map(message)
         elif message.startswith('`'): # Attributes
-            count = int(message[1:message.index('\r\n')])
-            attributes = {}
-            remainder = message[message.index('\r\n') + 2:]
-            for _ in range(count):
-                key, remainder = self.parse_bulk_string(remainder)
-                value, remainder = self.parse_bulk_string(remainder)
-                attributes[key] = value
-            return attributes
+            return self.parse_attributes(message) 
         elif message.startswith('~'): # Sets
-            count = int(message[1:message.index('\r\n')])
-            dictionary = {}
-            remainder = message[message.index('\r\n') + 2:]
-            for _ in range(count):
-                elem, remainder = self.parse_bulk_string(remainder)
-                dictionary[elem] = ""
-            return dictionary
+            return self.parse_set(message) 
         elif message.startswith('>'): # Pushes
-                count = int(message[1:message.index('\r\n')])
-                push_data = []
-                remainder = message[message.index('\r\n') + 2:]
-                for _ in range(count):
-                    elem, remainder = self.parse_bulk_string(remainder)
-                    push_data.append(elem)
-                return push_data
+            return self.parse_push(message)
         else:
             return None
 
@@ -79,8 +53,7 @@ class RESPParser:
         """Recursively parse arrays, including nested arrays."""
         count = int(message[1:message.index('\r\n')])
         elements = []
-        remainder = message[message.index('\r\n') + 2:]
-        
+        remainder = message[message.index('\r\n') + 2:] 
         for _ in range(count):
             # Check the type of the next element and parse accordingly
             if remainder.startswith('*'):  # Nested array
@@ -91,10 +64,8 @@ class RESPParser:
                 elements.append(elem)
             else:
                 elem, remainder = self.parse(remainder), remainder[2:]
-                elements.append(elem)
-        
+                elements.append(elem) 
         return elements
-
 
     def parse_bulk_string(self, message):
         """Helper to parse individual bulk strings in an array."""
@@ -106,6 +77,44 @@ class RESPParser:
         remainder = message[start + length + 2:]
         return bulk_string, remainder
 
+    def parse_map(self, message):
+        count = int(message[1:message.index('\r\n')])
+        dictionary = {}
+        remainder = message[message.index('\r\n') + 2:]
+        for _ in range(count):
+            key, remainder = self.parse_bulk_string(remainder)
+            value, remainder = self.parse_bulk_string(remainder)
+            dictionary[key] = value
+        return dictionary
+  
+    def parse_attributes(self, message): 
+        count = int(message[1:message.index('\r\n')])
+        attributes = {}
+        remainder = message[message.index('\r\n') + 2:]
+        for _ in range(count):
+            key, remainder = self.parse_bulk_string(remainder)
+            value, remainder = self.parse_bulk_string(remainder)
+            attributes[key] = value
+        return attributes
+
+    def parse_set(self, message):
+        count = int(message[1:message.index('\r\n')])
+        dictionary = {}
+        remainder = message[message.index('\r\n') + 2:]
+        for _ in range(count):
+            elem, remainder = self.parse_bulk_string(remainder)
+            dictionary[elem] = ""
+        return dictionary
+
+
+    def parse_push(self, message):
+        count = int(message[1:message.index('\r\n')])
+        push_data = []
+        remainder = message[message.index('\r\n') + 2:]
+        for _ in range(count):
+            elem, remainder = self.parse_bulk_string(remainder)
+            push_data.append(elem)
+        return push_data
 
 class RESPEncoder:
     def encode(self, data):
@@ -123,7 +132,6 @@ class RESPEncoder:
             return "$-1\r\n"
         else:
             raise TypeError("Unsupported data type")
-
 
 def run_tests():
     parser = RESPParser()

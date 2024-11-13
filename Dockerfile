@@ -16,7 +16,8 @@ RUN apt-get update && \
     wget \
     unzip \
     curl \
-    lua5.4
+    lua5.4 \
+    python3
 
 # Clean up to reduce image size
 RUN   apt-get autoremove -y && \
