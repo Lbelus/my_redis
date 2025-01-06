@@ -1,6 +1,9 @@
 #include <iostream>
 #include <sys/socket.h>
 #include <string.h>
+#include <poll.h>
+#include <assert.h>
+
 
 #ifndef CONN
 #define CONN
@@ -58,7 +61,7 @@ static die(const char* msg)
 
 int main(void)
 {
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK,  0);  // or use fcntl if you are that guy
     if (fd < 0)
     {
         die("socket() failed");
@@ -85,6 +88,15 @@ int main(void)
     if (rv)
     {
         die("listen() failed");
+    }
+    
+    std::vector<Conn *> fd2conn;
+    std::vector<pollfd> poll_args;
+    while (true)
+    {
+        poll_args.clear();
+        poll_args.push_back({listen_fd, POLLIN, 0});
+    
     }
 
     return EXIT_SUCCESS;
