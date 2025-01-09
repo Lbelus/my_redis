@@ -96,8 +96,38 @@ int main(void)
     {
         poll_args.clear();
         poll_args.push_back({listen_fd, POLLIN, 0});
-    
+        for (Conn *conn : fd2conn)
+        {
+            if (!conn)
+            {
+                continue;
+            }
+            // always poll() for error
+            struct pollfd pfd = {conn->fd, POLLERR, 0};
+            // poll() flags from the application's intent
+            if (conn->want_read)
+            {
+                pfd.events |= POLLIN;
+            }
+            if (conn->want_write)
+            {
+                pfd.events |= POLLOUT;
+            }
+            poll_args.push_back(pfd);
+        }
+        // wait for readiness
+        int poll_retval = poll(poll_args.data(), (nfds_t)poll_args.size(), -1);
+        if (poll_retval < 0 && errno == EINTR)
+        {
+            continue;
+        }
+        if (poll_ret_val < 0)
+        {
+            die("poll() failed")    
+        }
+
     }
+
 
     return EXIT_SUCCESS;
 }
